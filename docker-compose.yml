@@ -1,0 +1,129 @@
+services:
+  frontend:
+    build: ./src/frontend
+    container_name: frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+      - PAYMENTS_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:8080
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - shoppingassistantservice
+      - cartservice
+      - recommendationservice
+      - checkoutservice
+      - adservice
+      - paymentservice
+      - emailservice
+
+  # If you have the source code for the assistant, add it here:
+  shoppingassistantservice:
+    build: ./src/shoppingassistantservice
+    container_name: shoppingassistantservice
+    environment:
+      - PORT=8080
+    ports:
+      - "8081:8080" # Map to 8081 on host since frontend uses 8080
+  productcatalogservice:
+    build: ./src/productcatalogservice
+    container_name: productcatalogservice
+    environment:
+      - PORT=3550
+    ports:
+      - "3550:3550"
+  currencyservice:
+    build: ./src/currencyservice
+    container_name: currencyservice
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+      - DISABLE_PROFILER=1
+  cartservice:
+    build: ./src/cartservice/src
+    container_name: cartservice
+    ports:
+      - "7070:7070"
+    environment:
+      - PORT=7070
+      - REDIS_ADDR=redis-cart:6379
+      - DISABLE_PROFILER=1
+  shippingservice:
+    build: ./src/shippingservice
+    container_name: shippingservice
+    # ports:
+    #   - "50051:50051"
+    environment:
+      - PORT=50051
+      - DISABLE_PROFILER=1
+    depends_on:
+      - redis-cart
+  recommendationservice:
+    build: ./src/recommendationservice
+    container_name: recommendationservice
+    # ports:
+    #   - "8080:8080"
+    environment:
+      - PORT=8080
+      - DISABLE_PROFILER=1
+  checkoutservice:
+    build: ./src/checkoutservice
+    container_name: checkoutservice
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:8080
+      - DISABLE_PROFILER=1
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - shippingservice
+      - paymentservice
+      - emailservice
+  adservice:
+    build: ./src/adservice
+    container_name: adservice
+    ports:
+      - "9555:9555"
+    environment:
+      - PORT=9555
+      - DISABLE_PROFILER=1
+  paymentservice:
+    build: ./src/paymentservice
+    container_name: paymentservice
+    ports:
+      - "50051:50051"
+    environment:
+      - PORT=50051
+      - DISABLE_PROFILER=1
+  emailservice:
+    build: ./src/emailservice
+    container_name: emailservice
+    # ports:
+    #   - "8080:8080"
+    environment:
+      - PORT=8080
+      - DISABLE_PROFILER=1
+  redis-cart:
+    image: redis:alpine
+    container_name: redis-cart
+    ports:
+      - "6379:6379"
