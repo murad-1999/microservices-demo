@@ -28,8 +28,33 @@ services:
       - adservice
       - paymentservice
       - emailservice
+      - otel-collector
     networks:
       - default
+      - monitoring
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    volumes:
+      - ./src/otelcollector/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus exporter
+    networks:
+      - default
+      - monitoring
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://reddit_user:password@postgres:5432/reddit_db?sslmode=disable"
+    depends_on:
+      - postgres
+    networks:
       - monitoring
 
   # If you have the source code for the assistant, add it here:
@@ -211,6 +236,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     networks:
       - monitoring
 
