@@ -16,6 +16,8 @@ services:
       - AD_SERVICE_ADDR=adservice:9555
       - PAYMENTS_SERVICE_ADDR=paymentservice:50051
       - EMAIL_SERVICE_ADDR=emailservice:8080
+      - COLLECTOR_ADDR=otel-collector:4317
+      - OBSERVABILITY_ENABLED=true
     depends_on:
       - productcatalogservice
       - currencyservice
@@ -26,6 +28,9 @@ services:
       - adservice
       - paymentservice
       - emailservice
+    networks:
+      - default
+      - monitoring
 
   # If you have the source code for the assistant, add it here:
   shoppingassistantservice:
@@ -35,6 +40,9 @@ services:
       - PORT=8080
     ports:
       - "8081:8080" # Map to 8081 on host since frontend uses 8080
+    networks:
+      - default
+      - monitoring
   productcatalogservice:
     build: ./src/productcatalogservice
     container_name: productcatalogservice
@@ -42,6 +50,9 @@ services:
       - PORT=3550
     ports:
       - "3550:3550"
+    networks:
+      - default
+      - monitoring
   currencyservice:
     build: ./src/currencyservice
     container_name: currencyservice
@@ -50,6 +61,9 @@ services:
     environment:
       - PORT=7000
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   cartservice:
     build: ./src/cartservice/src
     container_name: cartservice
@@ -59,6 +73,9 @@ services:
       - PORT=7070
       - REDIS_ADDR=redis-cart:6379
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   shippingservice:
     build: ./src/shippingservice
     container_name: shippingservice
@@ -69,6 +86,9 @@ services:
       - DISABLE_PROFILER=1
     depends_on:
       - redis-cart
+    networks:
+      - default
+      - monitoring
   recommendationservice:
     build: ./src/recommendationservice
     container_name: recommendationservice
@@ -77,6 +97,9 @@ services:
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   checkoutservice:
     build: ./src/checkoutservice
     container_name: checkoutservice
@@ -98,6 +121,9 @@ services:
       - shippingservice
       - paymentservice
       - emailservice
+    networks:
+      - default
+      - monitoring
   adservice:
     build: ./src/adservice
     container_name: adservice
@@ -106,6 +132,9 @@ services:
     environment:
       - PORT=9555
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   paymentservice:
     build: ./src/paymentservice
     container_name: paymentservice
@@ -114,6 +143,9 @@ services:
     environment:
       - PORT=50051
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   emailservice:
     build: ./src/emailservice
     container_name: emailservice
@@ -122,8 +154,72 @@ services:
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
+    networks:
+      - default
+      - monitoring
   redis-cart:
     image: redis:alpine
     container_name: redis-cart
     ports:
       - "6379:6379"
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: reddit_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: reddit_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+    networks:
+      - monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # Auto-configure Prometheus as a data source
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - monitoring
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  postgres_data:
+
+
+networks:
+  monitoring:
+    driver: bridge
