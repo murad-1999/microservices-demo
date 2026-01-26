@@ -9,28 +9,7 @@ alerting:
         - targets: []
 
 scrape_configs:
-- job_name: 'microservices'
-    static_configs:
-      - targets: 
-          - 'frontend:8080'
-          - 'checkoutservice:5050'
-          - 'productcatalogservice:3550'
-          - 'currencyservice:7000'
-          - 'shippingservice:50051'
-          - 'cartservice:7070'
-          - 'recommendationservice:8080'
-          - 'adservice:9555'
-          - 'paymentservice:50051'
-          - 'emailservice:8080'
-          - 'postgres-exporter:9187'
-          - 'otel-collector:8889'
-          - 'postgres:5432'
-  # Prometheus self-monitoring
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-
-  # OpenTelemetry Collector
+  # OpenTelemetry Collector (receives metrics from all microservices)
   - job_name: 'otel-collector'
     static_configs:
       - targets: ['otel-collector:8889']
@@ -39,3 +18,8 @@ scrape_configs:
   - job_name: 'postgres-exporter'
     static_configs:
       - targets: ['postgres-exporter:9187']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

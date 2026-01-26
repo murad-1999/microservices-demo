@@ -16,8 +16,8 @@ services:
       - AD_SERVICE_ADDR=adservice:9555
       - PAYMENTS_SERVICE_ADDR=paymentservice:50051
       - EMAIL_SERVICE_ADDR=emailservice:8080
-      - COLLECTOR_ADDR=otel-collector:4317
-      - OBSERVABILITY_ENABLED=true
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     depends_on:
       - productcatalogservice
       - currencyservice
@@ -63,6 +63,8 @@ services:
     container_name: shoppingassistantservice
     environment:
       - PORT=8080
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     ports:
       - "8081:8080" # Map to 8081 on host since frontend uses 8080
     networks:
@@ -73,6 +75,8 @@ services:
     container_name: productcatalogservice
     environment:
       - PORT=3550
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     ports:
       - "3550:3550"
     networks:
@@ -86,6 +90,8 @@ services:
     environment:
       - PORT=7000
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring
@@ -98,6 +104,8 @@ services:
       - PORT=7070
       - REDIS_ADDR=redis-cart:6379
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring
@@ -109,6 +117,8 @@ services:
     environment:
       - PORT=50051
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     depends_on:
       - redis-cart
     networks:
@@ -122,6 +132,8 @@ services:
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring
@@ -139,6 +151,8 @@ services:
       - PAYMENT_SERVICE_ADDR=paymentservice:50051
       - EMAIL_SERVICE_ADDR=emailservice:8080
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     depends_on:
       - productcatalogservice
       - currencyservice
@@ -157,6 +171,8 @@ services:
     environment:
       - PORT=9555
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring
@@ -168,6 +184,8 @@ services:
     environment:
       - PORT=50051
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring
@@ -179,6 +197,8 @@ services:
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
+      - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - ENABLE_TRACING=1
     networks:
       - default
       - monitoring

@@ -29,7 +29,9 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -113,6 +115,7 @@ func main() {
 	if os.Getenv("ENABLE_TRACING") == "1" {
 		log.Info("Tracing enabled.")
 		initTracing(log, ctx, svc)
+		initMetrics(log, ctx, svc)
 	} else {
 		log.Info("Tracing disabled.")
 	}
@@ -170,8 +173,17 @@ func main() {
 	log.Infof("starting server on %s:%s", addr, srvPort)
 	log.Fatal(http.ListenAndServe(addr+":"+srvPort, handler))
 }
-func initStats(log logrus.FieldLogger) {
-	// TODO(arbrown) Implement OpenTelemtry stats
+func initMetrics(log logrus.FieldLogger, ctx context.Context, svc *frontendServer) (*sdkmetric.MeterProvider, error) {
+	exporter, err := otlpmetricgrpc.New(
+		ctx,
+		otlpmetricgrpc.WithGRPCConn(svc.collectorConn))
+	if err != nil {
+		log.Warnf("warn: Failed to create metrics exporter: %v", err)
+	}
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)))
+	otel.SetMeterProvider(mp)
+	return mp, err
 }
 
 func initTracing(log logrus.FieldLogger, ctx context.Context, svc *frontendServer) (*sdktrace.TracerProvider, error) {

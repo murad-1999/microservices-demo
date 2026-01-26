@@ -38,7 +38,9 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/propagation"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -90,7 +92,7 @@ func main() {
 	if os.Getenv("ENABLE_TRACING") == "1" {
 		log.Info("Tracing enabled.")
 		initTracing()
-
+		initMetrics()
 	} else {
 		log.Info("Tracing disabled.")
 	}
@@ -147,8 +149,28 @@ func main() {
 	log.Fatal(err)
 }
 
-func initStats() {
-	//TODO(arbrown) Implement OpenTelemetry stats
+func initMetrics() {
+	var (
+		collectorAddr string
+		collectorConn *grpc.ClientConn
+	)
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	mustMapEnv(&collectorAddr, "COLLECTOR_SERVICE_ADDR")
+	mustConnGRPC(ctx, &collectorConn, collectorAddr)
+
+	exporter, err := otlpmetricgrpc.New(
+		ctx,
+		otlpmetricgrpc.WithGRPCConn(collectorConn))
+	if err != nil {
+		log.Warnf("warn: Failed to create metrics exporter: %v", err)
+	}
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)))
+	otel.SetMeterProvider(mp)
 }
 
 func initTracing() {
