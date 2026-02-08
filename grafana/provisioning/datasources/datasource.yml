@@ -9,3 +9,15 @@ datasources:
     editable: true
     jsonData:
       timeInterval: "15s"
+  - name: Jaeger
+    type: jaeger
+    url: http://jaeger:16686
+    access: proxy
+    jsonData:
+      timeInterval: "5s"
+  - name: Loki
+    type: loki
+    url: http://loki:3100
+    access: proxy
+    jsonData:
+      timeInterval: "5s"
