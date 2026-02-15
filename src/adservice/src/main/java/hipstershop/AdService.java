@@ -28,6 +28,15 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.services.*;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.propagation.ContextPropagators;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTelemetry;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,6 +65,7 @@ public final class AdService {
 
     server =
         ServerBuilder.forPort(port)
+            .intercept(GrpcTelemetry.create(openTelemetry).newServerInterceptor())
             .addService(new AdServiceImpl())
             .addService(healthMgr.getHealthService())
             .build()
@@ -206,17 +216,38 @@ public final class AdService {
 
   }
 
+  private static OpenTelemetry openTelemetry = OpenTelemetry.noop();
+
   private static void initTracing() {
     if (System.getenv("DISABLE_TRACING") != null) {
       logger.info("Tracing disabled.");
       return;
     }
-    logger.info("Tracing enabled but temporarily unavailable");
-    logger.info("See https://github.com/GoogleCloudPlatform/microservices-demo/issues/422 for more info.");
+    String collectorAddr = System.getenv("COLLECTOR_SERVICE_ADDR");
+    if (collectorAddr == null || collectorAddr.isEmpty()) {
+      logger.warn("COLLECTOR_SERVICE_ADDR not set, tracing disabled");
+      return;
+    }
 
-    // TODO(arbrown) Implement OpenTelemetry tracing
-    
-    logger.info("Tracing enabled - Stackdriver exporter initialized.");
+    Resource resource = Resource.getDefault().toBuilder()
+        .put("service.name", System.getenv().getOrDefault("OTEL_SERVICE_NAME", "adservice"))
+        .build();
+
+    OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+        .setEndpoint("http://" + collectorAddr)
+        .build();
+
+    SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
+        .addSpanProcessor(BatchSpanProcessor.builder(spanExporter).build())
+        .setResource(resource)
+        .build();
+
+    openTelemetry = OpenTelemetrySdk.builder()
+        .setTracerProvider(tracerProvider)
+        .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+        .buildAndRegisterGlobal();
+
+    logger.info("Tracing enabled - OTLP exporter initialized.");
   }
 
   /** Main launches the server from the command line. */

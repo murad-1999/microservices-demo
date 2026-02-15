@@ -22,6 +22,13 @@ from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from flask import Flask, request
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+
 from langchain_google_alloydb_pg import AlloyDBEngine, AlloyDBVectorStore
 
 PROJECT_ID = os.environ["PROJECT_ID"]
@@ -61,6 +68,17 @@ vectorstore = AlloyDBVectorStore.create_sync(
 
 def create_app():
     app = Flask(__name__)
+
+    if os.getenv("ENABLE_TRACING") == "1":
+        resource = Resource(attributes={
+            SERVICE_NAME: os.getenv("OTEL_SERVICE_NAME", "shoppingassistantservice")
+        })
+        trace.set_tracer_provider(TracerProvider(resource=resource))
+        otel_endpoint = os.getenv("COLLECTOR_SERVICE_ADDR", "localhost:4317")
+        trace.get_tracer_provider().add_span_processor(
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=otel_endpoint, insecure=True))
+        )
+        FlaskInstrumentor().instrument_app(app)
 
     @app.route("/", methods=['POST'])
     def talkToGemini():

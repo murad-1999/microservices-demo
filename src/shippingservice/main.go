@@ -31,6 +31,12 @@ import (
 
 	pb "github.com/GoogleCloudPlatform/microservices-demo/src/shippingservice/genproto"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 const (
@@ -55,9 +61,8 @@ func init() {
 
 func main() {
 	if os.Getenv("DISABLE_TRACING") == "" {
-		log.Info("Tracing enabled, but temporarily unavailable")
-		log.Info("See https://github.com/GoogleCloudPlatform/microservices-demo/issues/422 for more info.")
-		go initTracing()
+		log.Info("Tracing enabled.")
+		initTracing()
 	} else {
 		log.Info("Tracing disabled.")
 	}
@@ -83,10 +88,14 @@ func main() {
 	var srv *grpc.Server
 	if os.Getenv("DISABLE_STATS") == "" {
 		log.Info("Stats enabled, but temporarily unavailable")
-		srv = grpc.NewServer()
+		srv = grpc.NewServer(
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		)
 	} else {
 		log.Info("Stats disabled.")
-		srv = grpc.NewServer()
+		srv = grpc.NewServer(
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		)
 	}
 	svc := &server{}
 	pb.RegisterShippingServiceServer(srv, svc)
@@ -153,7 +162,27 @@ func initStats() {
 }
 
 func initTracing() {
-	// TODO(arbrown) Implement OpenTelemetry tracing
+	ctx := context.Background()
+	collectorAddr := os.Getenv("COLLECTOR_SERVICE_ADDR")
+	if collectorAddr == "" {
+		log.Warn("COLLECTOR_SERVICE_ADDR not set, tracing disabled")
+		return
+	}
+
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpoint(collectorAddr),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 }
 
 func initProfiling(service, version string) {

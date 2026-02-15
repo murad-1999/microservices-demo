@@ -17,6 +17,7 @@ services:
       - PAYMENTS_SERVICE_ADDR=paymentservice:50051
       - EMAIL_SERVICE_ADDR=emailservice:8080
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=frontend
       - ENABLE_TRACING=1
     depends_on:
       - productcatalogservice
@@ -30,21 +31,19 @@ services:
       - emailservice
       - otel-collector
     networks:
-      - default
       - monitoring
 
-  # If you have the source code for the assistant, add it here:
   shoppingassistantservice:
     build: ./src/shoppingassistantservice
     container_name: shoppingassistantservice
     environment:
       - PORT=8080
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=shoppingassistantservice
       - ENABLE_TRACING=1
     ports:
-      - "8081:8080" # Map to 8081 on host since frontend uses 8080
+      - "8081:8080"
     networks:
-      - default
       - monitoring
   productcatalogservice:
     build: ./src/productcatalogservice
@@ -52,11 +51,11 @@ services:
     environment:
       - PORT=3550
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=productcatalogservice
       - ENABLE_TRACING=1
     ports:
       - "3550:3550"
     networks:
-      - default
       - monitoring
   currencyservice:
     build: ./src/currencyservice
@@ -67,9 +66,9 @@ services:
       - PORT=7000
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=currencyservice
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
   cartservice:
     build: ./src/cartservice/src
@@ -81,38 +80,37 @@ services:
       - REDIS_ADDR=redis-cart:6379
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=cartservice
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
   shippingservice:
     build: ./src/shippingservice
     container_name: shippingservice
-    # ports:
-    #   - "50051:50051"
     environment:
       - PORT=50051
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=shippingservice
       - ENABLE_TRACING=1
     depends_on:
       - redis-cart
     networks:
-      - default
       - monitoring
   recommendationservice:
     build: ./src/recommendationservice
     container_name: recommendationservice
-    # ports:
-    #   - "8080:8080"
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=recommendationservice
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
+    depends_on:
+      - productcatalogservice
   checkoutservice:
     build: ./src/checkoutservice
     container_name: checkoutservice
@@ -128,6 +126,7 @@ services:
       - EMAIL_SERVICE_ADDR=emailservice:8080
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=checkoutservice
       - ENABLE_TRACING=1
     depends_on:
       - productcatalogservice
@@ -137,7 +136,6 @@ services:
       - paymentservice
       - emailservice
     networks:
-      - default
       - monitoring
   adservice:
     build: ./src/adservice
@@ -148,9 +146,9 @@ services:
       - PORT=9555
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=adservice
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
   paymentservice:
     build: ./src/paymentservice
@@ -161,28 +159,28 @@ services:
       - PORT=50051
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=paymentservice
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
   emailservice:
     build: ./src/emailservice
     container_name: emailservice
-    # ports:
-    #   - "8080:8080"
     environment:
       - PORT=8080
       - DISABLE_PROFILER=1
       - COLLECTOR_SERVICE_ADDR=otel-collector:4317
+      - OTEL_SERVICE_NAME=emailservice
       - ENABLE_TRACING=1
     networks:
-      - default
       - monitoring
   redis-cart:
     image: redis:alpine
     container_name: redis-cart
     ports:
       - "6379:6379"
+    networks:
+      - monitoring
   postgres:
     image: postgres:latest
     container_name: postgres
@@ -213,18 +211,18 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "8888:8888" # Prometheus metrics exposed by the collector
-      - "8889:8889" # Prometheus exporter metrics
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP http receiver
+      - "8888:8888"
+      - "8889:8889"
+      - "4317:4317"
+      - "4318:4318"
     networks:
       - monitoring
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
     ports:
-      - "16686:16686" # Web UI
-      - "14250:14250" # Model Store
+      - "16686:16686"
+      - "14250:14250"
     networks:
       - monitoring
   loki:
@@ -272,7 +270,6 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"
-      # Auto-configure Prometheus as a data source
       GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     restart: unless-stopped
